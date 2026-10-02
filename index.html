@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ตรวจสอบสถานะการส่งข้อสอบ</title>
+    <style>
+        /* จัดรูปแบบหน้าตาเว็บให้ดูสะอาดตา */
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+        
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f3f6f9;
+            margin: 0;
+            padding: 30px 15px;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        h2 {
+            text-align: center;
+            color: #1a56db;
+            margin-bottom: 25px;
+        }
+        .loading {
+            text-align: center;
+            font-size: 18px;
+            color: #6b7280;
+            padding: 20px;
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+            font-size: 16px;
+        }
+        th {
+            background-color: #f9fafb;
+            color: #374151;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f3f4f6;
+        }
+        .status-badge {
+            color: #166534;
+            background-color: #dcfce7;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📋 รายชื่อผู้ที่ส่งข้อสอบเรียบร้อยแล้ว</h2>
+    <div id="loading" class="loading">กำลังโหลดข้อมูล... ⏳</div>
+    
+    <div class="table-responsive">
+        <table id="dataTable" style="display: none;">
+            <thead>
+                <tr>
+                    <th style="width: 10%; text-align: center;">ลำดับ</th>
+                    <th style="width: 25%;">เวลาที่ส่ง</th>
+                    <th style="width: 30%;">ชื่อ-นามสกุล</th>
+                    <th style="width: 20%;">สาขาวิชา</th>
+                    <th style="width: 15%; text-align: center;">สถานะ</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <!-- ข้อมูลจาก Google Sheets จะถูกนำมาแสดงที่นี่ -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // ID ของ Google Sheets ที่คุณให้มา
+    const sheetId = '1e4w8TEjQybp6oDn1uy4wUN4eQRwDx0tjsPlY9-Z9Xas';
+    // ชื่อ Sheet ที่ต้องการดึงข้อมูล
+    const sheetName = 'Exam Responses';
+    // URL สำหรับดึงข้อมูลในรูปแบบ JSON
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+
+    fetch(url)
+        .then(response => response.text())
+        .then(text => {
+            // จัดการข้อมูลที่ถูกหุ้มด้วยฟังก์ชันของ Google ให้อยู่ในรูป JSON ที่ถูกต้อง
+            const jsonString = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+            const data = JSON.parse(jsonString);
+            
+            const rows = data.table.rows;
+            const tableBody = document.getElementById('tableBody');
+            
+            let count = 1;
+            
+            // วนลูปอ่านข้อมูลทีละบรรทัด
+            rows.forEach(row => {
+                const c = row.c;
+                
+                // เช็คว่าคอลัมน์ "ชื่อ-นามสกุล" (คอลัมน์ที่ 6 หรือ Index 5) มีข้อมูลหรือไม่
+                if (c && c[5] && c[5].v) {
+                    
+                    // ดึงข้อมูลแต่ละคอลัมน์ (Index อ้างอิงจาก A=0, B=1, ...)
+                    // Index 2 = Submit Time, Index 5 = ชื่อ-นามสกุล, Index 7 = สาขาวิชา
+                    const submitTime = (c[2] && c[2].f) ? c[2].f : ((c[2] && c[2].v) ? c[2].v : '-');
+                    const name = (c[5] && c[5].v) ? c[5].v : '-';
+                    const major = (c[7] && c[7].v) ? c[7].v : '-';
+                    
+                    const tr = document.createElement('tr');
+                    
+                    tr.innerHTML = `
+                        <td style="text-align: center;">${count}</td>
+                        <td>${submitTime}</td>
+                        <td>${name}</td>
+                        <td>${major}</td>
+                        <td style="text-align: center;"><span class="status-badge">✅ ส่งแล้ว</span></td>
+                    `;
+                    
+                    tableBody.appendChild(tr);
+                    count++;
+                }
+            });
+            
+            // ปิดข้อความกำลังโหลด และแสดงตารางเมื่อข้อมูลพร้อม
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('dataTable').style.display = 'table';
+        })
+        .catch(error => {
+            console.error('Error fetching data:', error);
+            document.getElementById('loading').innerHTML = '❌ เกิดข้อผิดพลาดในการดึงข้อมูล (ไฟล์อาจไม่ได้ตั้งค่าแชร์สาธารณะ)';
+            document.getElementById('loading').style.color = '#dc2626';
+        });
+</script>
+
+</body>
+</html>
